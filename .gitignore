@@ -1,0 +1,24 @@
+# PowerShell
+*.ps1xml
+*.psm1xml
+
+# Logs
+logs/
+*.log
+
+# VS Code
+.vscode/
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Discuss drafts (not version controlled)
+discuss/*
+!discuss/.gitkeep
+
+# Archive (old versions)
+archive/*
+!archive/.gitkeep
