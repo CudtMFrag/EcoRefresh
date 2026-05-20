@@ -1,5 +1,6 @@
-# Autorefresh
-# 联想笔记本刷新率自动化切换
+# EcoRefresh
+
+省电笔记本：根据电源自动切换显示器刷新率。**个人项目**——纯 PowerShell 脚本 + Windows 计划任务，无安装包，无 GUI，无通用性保证。仅在自己 ThinkBook 上测试通过。
 
 ## 功能
 
