@@ -22,3 +22,7 @@ discuss/*
 # Archive (old versions)
 archive/*
 !archive/.gitkeep
+
+# AI tool config (not project-specific)
+.claude/
+.crew/

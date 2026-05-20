@@ -52,3 +52,18 @@ schtasks /Delete /TN "\事件查看器任务\离电来电自动刷新率切换" 
 ## 文档
 
 详见 `docs/联想刷新率自动化全流程.md`
+
+## 兼容性
+
+| 项目 | 要求 |
+|---|---|
+| 操作系统 | Windows 10/11（64 位） |
+| Shell | PowerShell 7+（pwsh），非 Windows PowerShell 5.1 |
+| 测试机型 | ThinkBook 16+ G6+ AHP（3200×2000 @ 165Hz 面板） |
+| 理论兼容 | 任何支持多刷新率的 Windows 笔记本 |
+
+**已知限制**：
+- 仅切换刷新率，不改变分辨率
+- 依赖 `user32.dll` 的 `ChangeDisplaySettingsW`——某些显卡驱动可能忽略此 API
+- 计划任务必须在用户登录后运行（Session 0 无法访问显示器）
+- 事件触发任务（`\事件查看器任务\`）需手动创建或导入 XML；安装脚本创建的是轮询任务（`\AutoRefreshRate`）
