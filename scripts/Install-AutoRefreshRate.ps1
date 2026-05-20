@@ -1,5 +1,5 @@
 # Install-AutoRefreshRate.ps1
-# 安装电源感知自动刷新率切换（离电 60Hz / 插电 165Hz）
+# 安装电源感知自动刷新率切换（事件驱动 + 轮询兜底）
 # 用法: .\Install-AutoRefreshRate.ps1 [-BatteryHz 60] [-AcHz 165]
 
 param(
@@ -8,9 +8,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$taskName    = 'AutoRefreshRate'
-$switchScript = Join-Path $PSScriptRoot 'Set-RefreshRate.ps1'
-$vbsScript    = Join-Path $PSScriptRoot 'AutoRefreshRate-Trigger.vbs'
+$taskName       = '离电来电自动刷新率切换'
+$taskPath       = '\事件查看器任务\'
+$taskFullName   = "${taskPath}${taskName}"
+$switchScript   = Join-Path $PSScriptRoot 'Set-RefreshRate.ps1'
+$vbsScript      = Join-Path $PSScriptRoot 'AutoRefreshRate-Trigger.vbs'
+$userId         = "$env:USERDOMAIN\$env:USERNAME"
 
 # ====== 1. 检查核心脚本 ======
 if (-not (Test-Path $switchScript)) {
@@ -38,65 +41,112 @@ Set-Content -Path $vbsScript -Value $vbsContent -Encoding ASCII
 Write-Host "✓ VBS 包装器已生成: $vbsScript" -ForegroundColor Green
 
 # ====== 3. 清理旧任务 ======
-$existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+$existing = Get-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction SilentlyContinue
 if ($existing) {
-    Write-Host "  卸载旧任务: $taskName" -ForegroundColor Yellow
-    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+    Write-Host "  卸载旧任务: $taskFullName" -ForegroundColor Yellow
+    Unregister-ScheduledTask -TaskName $taskName -TaskPath $taskPath -Confirm:$false
 }
 
-# ====== 4. 创建计划任务 ======
-$wscriptExe = Join-Path $env:SystemRoot 'System32\wscript.exe'
+# ====== 4. 构建事件驱动任务 XML ======
+# 触发器：
+#   - Kernel-Power 105: 接通电源
+#   - Kernel-Power 107: 断开电源
+#   - SessionUnlock:    解锁会话
+#   - At startup:       开机
+#   - At logon:         登录（延迟 10s）
 
-$action = New-ScheduledTaskAction `
-    -Execute $wscriptExe `
-    -Argument "`"$vbsScript`""
+$taskXml = @"
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Author>$userId</Author>
+    <Description>检测电源状态自动切换显示器刷新率：电池→${BatteryHz}Hz，电源→${AcHz}Hz</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <EventTrigger>
+      <Enabled>true</Enabled>
+      <Subscription>&lt;QueryList&gt;&lt;Query Id="0" Path="System"&gt;&lt;Select Path="System"&gt;*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=105]]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription>
+    </EventTrigger>
+    <EventTrigger>
+      <Enabled>true</Enabled>
+      <Subscription>&lt;QueryList&gt;&lt;Query Id="0" Path="System"&gt;&lt;Select Path="System"&gt;*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=107]]&lt;/Select&gt;&lt;/Query&gt;&lt;/QueryList&gt;</Subscription>
+    </EventTrigger>
+    <SessionStateChangeTrigger>
+      <Enabled>true</Enabled>
+      <StateChange>SessionUnlock</StateChange>
+      <UserId>$userId</UserId>
+    </SessionStateChangeTrigger>
+    <BootTrigger>
+      <Enabled>true</Enabled>
+    </BootTrigger>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+      <Delay>PT10S</Delay>
+      <UserId>$userId</UserId>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <UserId>$userId</UserId>
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <AllowStartOnBatteries>true</AllowStartOnBatteries>
+    <DontStopIfGoingOnBatteries>true</DontStopIfGoingOnBatteries>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <Compatibility>Win8</Compatibility>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>C:\Windows\System32\wscript.exe</Command>
+      <Arguments>"$vbsScript"</Arguments>
+    </Exec>
+  </Actions>
+</Task>
+"@
 
-$principal = New-ScheduledTaskPrincipal `
-    -UserId "$env:USERDOMAIN\$env:USERNAME" `
-    -LogonType Interactive `
-    -RunLevel Highest
+# ====== 5. 创建事件任务 ======
+# 先确保目录存在（schtasks 不支持自动创建，用临时任务创建目录再删）
+$folderExists = Get-ScheduledTask -TaskPath $taskPath -ErrorAction SilentlyContinue
+if (-not $folderExists) {
+    $dummyAction = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument '/c exit'
+    $dummyPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive
+    $dummyTask = Register-ScheduledTask -TaskName '_dummy_folder_creator' -TaskPath $taskPath `
+        -Action $dummyAction -Principal $dummyPrincipal -Trigger (New-ScheduledTaskTrigger -AtStartup) -Force
+    Unregister-ScheduledTask -TaskName '_dummy_folder_creator' -TaskPath $taskPath -Confirm:$false
+}
 
-$settings = New-ScheduledTaskSettingsSet `
-    -AllowStartIfOnBatteries:$true `
-    -DontStopIfGoingOnBatteries:$true `
-    -StartWhenAvailable `
-    -MultipleInstances IgnoreNew `
-    -Compatibility Win8
+$tempXmlPath = Join-Path $env:TEMP 'AutoRefreshRate_Task.xml'
+$taskXml | Out-File -FilePath $tempXmlPath -Encoding Unicode
+Register-ScheduledTask -Xml (Get-Content $tempXmlPath -Raw) -TaskName $taskName -TaskPath $taskPath -Force | Out-Null
+Remove-Item $tempXmlPath -Force
 
-# 三个触发器: 开机 + 登录 + 每3分钟轮询
-$triggers = @()
-$triggers += New-ScheduledTaskTrigger -AtStartup
-$triggers += New-ScheduledTaskTrigger -AtLogOn
-# 无限重复: 3650 天 ≈ 10 年
-$triggers += New-ScheduledTaskTrigger -Once -At (Get-Date) `
-    -RepetitionInterval (New-TimeSpan -Minutes 3) `
-    -RepetitionDuration (New-TimeSpan -Days 3650)
+Write-Host "✓ 事件任务已注册: $taskFullName" -ForegroundColor Green
 
-Register-ScheduledTask -TaskName $taskName `
-    -Action $action -Principal $principal -Settings $settings `
-    -Trigger $triggers -Force | Out-Null
-
-Write-Host "✓ 计划任务已注册: $taskName" -ForegroundColor Green
-
-# ====== 5. 首次同步 ======
+# ====== 6. 首次同步 ======
 Write-Host ""
 Write-Host "  执行首次同步..." -ForegroundColor Cyan
 & pwsh -NoProfile -File $switchScript -BatteryHz $BatteryHz -AcHz $AcHz
 
-# ====== 6. 总结 ======
+# ====== 7. 总结 ======
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  安装完成！" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  规则 : 电池 → ${BatteryHz}Hz  /  电源 → ${AcHz}Hz" -ForegroundColor White
-Write-Host "  触发 : 开机 + 登录 + 每 3 分钟轮询"              -ForegroundColor White
+Write-Host "  触发 : Kernel-Power 105/107 + 解锁 + 开机 + 登录"  -ForegroundColor White
 Write-Host "  入口 : wscript.exe → $vbsScript"                  -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "  管理:" -ForegroundColor DarkGray
-Write-Host "    查看  : Get-ScheduledTask '$taskName'"           -ForegroundColor DarkGray
-Write-Host "    运行  : Start-ScheduledTask '$taskName'"         -ForegroundColor DarkGray
-Write-Host "    状态  : Get-ScheduledTaskInfo '$taskName'"       -ForegroundColor DarkGray
-Write-Host "    卸载  : Unregister-ScheduledTask '$taskName'"    -ForegroundColor DarkGray
+Write-Host "    查看  : Get-ScheduledTask -TaskName '$taskName' -TaskPath '$taskPath'"   -ForegroundColor DarkGray
+Write-Host "    运行  : Start-ScheduledTask -TaskName '$taskName' -TaskPath '$taskPath'" -ForegroundColor DarkGray
+Write-Host "    状态  : Get-ScheduledTaskInfo -TaskName '$taskName' -TaskPath '$taskPath'" -ForegroundColor DarkGray
+Write-Host "    卸载  : Unregister-ScheduledTask -TaskName '$taskName' -TaskPath '$taskPath'" -ForegroundColor DarkGray
 Write-Host ""
 Read-Host "按 Enter 退出"

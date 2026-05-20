@@ -32,7 +32,7 @@
 .\scripts\Install-AutoRefreshRate.ps1 -BatteryHz 48 -AcHz 120  # 自定义
 ```
 
-安装脚本会生成 VBS 包装器并注册计划任务。
+安装脚本会生成 VBS 包装器并注册事件驱动计划任务（Kernel-Power 105/107 + 解锁 + 开机 + 登录）。
 
 ## 使用
 
@@ -66,4 +66,3 @@ schtasks /Delete /TN "\事件查看器任务\离电来电自动刷新率切换" 
 - 仅切换刷新率，不改变分辨率
 - 依赖 `user32.dll` 的 `ChangeDisplaySettingsW`——某些显卡驱动可能忽略此 API
 - 计划任务必须在用户登录后运行（Session 0 无法访问显示器）
-- 事件触发任务（`\事件查看器任务\`）需手动创建或导入 XML；安装脚本创建的是轮询任务（`\AutoRefreshRate`）
