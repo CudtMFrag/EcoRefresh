@@ -2,10 +2,20 @@
 # 安装电源感知自动刷新率切换（事件驱动 + 轮询兜底）
 # 用法: .\Install-AutoRefreshRate.ps1 [-BatteryHz 60] [-AcHz 165]
 
+
 param(
     [int]$BatteryHz = 60,
     [int]$AcHz      = 165
+
 )
+
+# ====== 提权检查 =====
+if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    $myPath = $MyInvocation.MyCommand.Path
+    $myArgs  = $PSBoundParameters.GetEnumerator() | ForEach-Object { "-$($_.Key) $($_.Value)" }
+    Start-Process pwsh -Verb RunAs -ArgumentList "-NoProfile -File `"$myPath`" $myArgs"
+    exit
+}
 
 $ErrorActionPreference = 'Stop'
 $taskName       = '离电来电自动刷新率切换'
