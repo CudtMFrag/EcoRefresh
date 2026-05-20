@@ -18,6 +18,7 @@
 | Custom Resolution Utility (CRU) | 驱动级工具 | ❌ 手动 | ✅ | — | 免费 |
 | DisplayFusion | 商业应用 | ⚠️ 需脚本 | ✅ | ❌ | ~$35 |
 | HRC (HotKey Resolution Changer) | 桌面工具 | ❌ 热键手动 | 未知 | — | 免费 |
+
 ## 架构
 
 ```
