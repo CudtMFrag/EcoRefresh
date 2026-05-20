@@ -10,14 +10,14 @@
 
 ## 同类对比
 
-| 方案 | 类型 | 自动切换 | ThinkBook 兼容 | 零闪烁 | 成本 |
-|---|---|---|---|---|
-| **EcoRefresh** | 脚本 + 计划任务 | ✅ 电源感知 | ✅ | ✅ VBS 入口 | 免费 |
-| Windows 设置 | 系统 GUI | ❌ 手动 | ✅ | — | 免费 |
+| 方案 | 说明 | 自动切换 | ThinkBook | 零闪烁 | 费用 |
+|---|---|---|---|---|---|
+| **EcoRefresh** | 脚本 + 计划任务 | ✅ 电源感知 | ✅ | ✅ | 免费 |
+| Windows 设置 | 系统自带 GUI | ❌ 纯手动 | ✅ | — | 免费 |
 | LenovoLegionToolkit | 桌面应用 | ✅ | ❌ 仅 Legion | ✅ | 免费 |
-| Custom Resolution Utility (CRU) | 驱动级工具 | ❌ 手动 | ✅ | — | 免费 |
-| DisplayFusion | 商业应用 | ⚠️ 需脚本 | ✅ | ❌ | ~$35 |
-| HRC (HotKey Resolution Changer) | 桌面工具 | ❌ 热键手动 | 未知 | — | 免费 |
+| CRU | 驱动级工具 | ❌ 纯手动 | ✅ | — | 免费 |
+| DisplayFusion | 商业应用 | ⚠️ 需自写脚本 | ✅ | ❌ | ~$35 |
+| HRC | 热键工具 | ❌ 按热键 | 未知 | — | 免费 |
 
 ## 架构
 
