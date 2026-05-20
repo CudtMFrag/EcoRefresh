@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Command *)",
+      "PowerShell(pi *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Write-Host \"=== Current PATH entries ===\"; $env:PATH -split ';' | Select-Object -First 15; Write-Host \"=== User PATH \\(registry\\) ===\"; [Environment]::GetEnvironmentVariable\\('PATH', 'User'\\) -split ';' | Select-String nvm; Write-Host \"=== System PATH \\(registry\\) ===\"; [Environment]::GetEnvironmentVariable\\('PATH', 'Machine'\\) -split ';' | Select-String nvm)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "PowerShell(node --version 2>&1)",
+      "PowerShell(Get-Item \"C:\\\\Program Files\\\\nodejs\\\\npm\" | Select-Object Name, Extension, Length, @{N='Type';E={if\\($_.PSIsContainer\\){'Directory'}else{'File'}}}; Get-Content \"C:\\\\Program Files\\\\nodejs\\\\npm\" -TotalCount 3 -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Content \"C:\\\\Program Files\\\\nodejs\\\\npm.cmd\"; Write-Output \"---\"; Get-Content \"C:\\\\Program Files\\\\nodejs\\\\npm\" -TotalCount 5; Write-Output \"---\"; [System.Environment]::GetEnvironmentVariable\\('Path', 'User'\\) -split ';' | Select-String 'nodejs'; [System.Environment]::GetEnvironmentVariable\\('Path', 'Machine'\\) -split ';' | Select-String 'nodejs')",
+      "PowerShell($env:PATHEXT -split ';'; Write-Output \"---\"; & \"cmd.exe\" /c \"npm --version\" 2>&1)"
+    ]
+  }
+}

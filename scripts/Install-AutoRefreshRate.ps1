@@ -31,7 +31,7 @@ Start-Sleep -Seconds 1
 `$onBattery = ([System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus -eq 'Offline')
 `$target = if (`$onBattery) { `$batteryHz } else { `$acHz }
 
-Start-Process -FilePath pwsh -ArgumentList "-NoProfile -WindowStyle Hidden -File \`"`$switch\`" -Hz `$target" -WindowStyle Hidden -Wait
+(New-Object -ComObject WScript.Shell).Run("pwsh -NoProfile -WindowStyle Hidden -File ``"`$switch``" -Hz `$target", 0, 1)
 "@
 
 Set-Content -Path $triggerScript -Value $triggerContent -Encoding UTF8
