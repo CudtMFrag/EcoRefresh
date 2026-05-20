@@ -1,12 +1,19 @@
 # Set-RefreshRate.ps1
 # 切换显示器刷新率（仅刷新率，不动分辨率）
-# 用法: .\Set-RefreshRate.ps1 -Hz 165
-#        .\Set-RefreshRate.ps1 -Hz 60
+# 用法:
+#   .\Set-RefreshRate.ps1 -Hz 165                  # 手动切 165Hz
+#   .\Set-RefreshRate.ps1                           # 自动模式（电池→60Hz，电源→165Hz）
+#   .\Set-RefreshRate.ps1 -BatteryHz 48 -AcHz 120   # 自定义对应关系
 
-param([Parameter(Mandatory=$true)][int]$Hz)
+param(
+    [int]$Hz,
+    [int]$BatteryHz = 60,
+    [int]$AcHz      = 165
+)
 
 $ErrorActionPreference = 'Stop'
 
+# ====== Win32 API (raw IntPtr buffer, 此机型托管 DEVMODEW 返回 0) ======
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -22,34 +29,44 @@ public static class Disp
 }
 '@
 
-function Set-Hz($target) {
+function Set-Hz($targetHz) {
     $f = [Runtime.InteropServices.Marshal]
-    # Test
+
+    # Test first
     $b = $f::AllocHGlobal([Disp]::BUF)
     try {
         for ($i=0;$i-lt[Disp]::BUF;$i++){$f::WriteByte($b,$i,0)}
         $f::WriteInt16($b,[Disp]::OFF_SIZE,188)
         $f::WriteInt32($b,[Disp]::OFF_FIELDS,[Disp]::DM_HZ)
-        $f::WriteInt32($b,[Disp]::OFF_HZ,$target)
+        $f::WriteInt32($b,[Disp]::OFF_HZ,$targetHz)
         if ([Disp]::ChangeDisplaySettingsW($b,[Disp]::CDS_TEST) -ne [Disp]::SUCCESS) { return $false }
     } finally { $f::FreeHGlobal($b) }
+
     # Apply
     $b = $f::AllocHGlobal([Disp]::BUF)
     try {
         for ($i=0;$i-lt[Disp]::BUF;$i++){$f::WriteByte($b,$i,0)}
         $f::WriteInt16($b,[Disp]::OFF_SIZE,188)
         $f::WriteInt32($b,[Disp]::OFF_FIELDS,[Disp]::DM_HZ)
-        $f::WriteInt32($b,[Disp]::OFF_HZ,$target)
+        $f::WriteInt32($b,[Disp]::OFF_HZ,$targetHz)
         return ([Disp]::ChangeDisplaySettingsW($b,[Disp]::CDS_UPDATEREGISTRY) -eq [Disp]::SUCCESS)
     } finally { $f::FreeHGlobal($b) }
 }
 
-# 获取当前刷新率，避免重复切换
+# ====== 自动模式：根据电源选择目标 Hz ======
+if (-not $PSBoundParameters.ContainsKey('Hz')) {
+    Add-Type -AssemblyName System.Windows.Forms
+    Start-Sleep -Seconds 1
+    $onBattery = ([System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus -eq 'Offline')
+    $Hz = if ($onBattery) { $BatteryHz } else { $AcHz }
+}
+
+# ====== 读取当前刷新率，避免重复切换 ======
 $b = [Runtime.InteropServices.Marshal]::AllocHGlobal([Disp]::BUF)
 try {
     for ($i=0;$i-lt[Disp]::BUF;$i++){[Runtime.InteropServices.Marshal]::WriteByte($b,$i,0)}
     [Runtime.InteropServices.Marshal]::WriteInt16($b,[Disp]::OFF_SIZE,188)
-    $r = [Disp]::EnumDisplaySettingsW([IntPtr]::Zero,[Disp]::ENUM_CURRENT,$b)
+    $r   = [Disp]::EnumDisplaySettingsW([IntPtr]::Zero,[Disp]::ENUM_CURRENT,$b)
     $cur = [Runtime.InteropServices.Marshal]::ReadInt32($b,[Disp]::OFF_HZ)
     $w   = [Runtime.InteropServices.Marshal]::ReadInt32($b,[Disp]::OFF_W)
     $h   = [Runtime.InteropServices.Marshal]::ReadInt32($b,[Disp]::OFF_H)
